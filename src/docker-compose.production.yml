@@ -1,10 +1,6 @@
-﻿version: '3.9'
-name: discord-bot-production
-services:
+﻿services:
   host:
-    image: discordbot_production
-    build:
-      context: .
-      dockerfile: ConsoleApp/Dockerfile
+    image: grl-bot:<IMAGE_TAG>
+    container_name: grl-bot
     environment:
       - DOTNET_ENVIRONMENT=Production
