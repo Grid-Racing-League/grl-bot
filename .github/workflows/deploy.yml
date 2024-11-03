@@ -1,0 +1,44 @@
+name: .NET Deployment
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 8.0.x
+
+    - name: Inject Discord bot token to appsettings
+      run: |
+        # Replace the placeholder in appsettings.json with the actual connection string from secrets
+        sed -i 's|<DISCORD_BOT_TOKEN>|'"${{ secrets.DISCORD_BOT_TOKEN }}"'|g' src/ConsoleApp/appsettings.json
+
+    - name: Publish
+      run: dotnet publish /p:DebugType=None /p:DebugSymbols=false -c Release -r linux-x64 --self-contained false -o deploy src/ConsoleApp/ConsoleApp.csproj
+
+    - name: Deploy
+      run: |
+        # Create SSH directory and set up permissions
+        mkdir -p ~/.ssh
+        echo "${{ secrets.DEPLOYMENT_KEY }}" > ~/.ssh/deployment_key
+        chmod 600 ~/.ssh/deployment_key
+
+        # Add server to known_hosts to prevent host verification issues
+        ssh-keyscan -H "${{ secrets.SERVER_ADDRESS }}" >> ~/.ssh/known_hosts
+
+        # SSH into the server and remove everything from DEPLOY_PATH
+        ssh -i ~/.ssh/deployment_key "${{ secrets.DEPLOYMENT_USER }}"@${{ secrets.SERVER_ADDRESS }} 'sudo rm -rf ${{ secrets.DEPLOY_PATH }}/*'
+
+        # Use SCP to transfer files to the deployment path
+        scp -o StrictHostKeyChecking=no -i ~/.ssh/deployment_key -r ./deploy/* "${{ secrets.DEPLOYMENT_USER }}"@${{ secrets.SERVER_ADDRESS }}:${{ secrets.DEPLOY_PATH }}
+
+        # SSH into the server and restart the service
+        ssh -i ~/.ssh/deployment_key "${{ secrets.DEPLOYMENT_USER }}"@${{ secrets.SERVER_ADDRESS }} 'sudo systemctl restart ${{ secrets.SERVICE_NAME }}'
