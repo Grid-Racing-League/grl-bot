@@ -13,6 +13,12 @@
 		<None Update="appsettings.*.json" CopyToPublishDirectory="Never" CopyToOutputDirectory="PreserveNewest"/>
 	</ItemGroup>
 
+	<Target Name="ExcludeDevelopmentSettings" BeforeTargets="Publish">
+		<ItemGroup>
+			<Content Remove="appsettings.*.json" />
+		</ItemGroup>
+	</Target>
+	
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0"/>
 	</ItemGroup>
