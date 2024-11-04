@@ -7,11 +7,13 @@ registries:
 
 updates:
   - package-ecosystem: "nuget"
-    registries:
-      - public
-    directory: "/"
+    directory: "/src"
     schedule:
       interval: "weekly"
       day: "monday"
     target-branch: "master"
     open-pull-requests-limit: 10
+    registries:
+      - public
+    allow:
+      - dependency-type: "all"
