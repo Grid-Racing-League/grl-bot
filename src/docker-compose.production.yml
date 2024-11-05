@@ -4,3 +4,4 @@
     container_name: grl-bot
     environment:
       - DOTNET_ENVIRONMENT=Production
+    restart: unless-stopped
