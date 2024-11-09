@@ -15,7 +15,7 @@ public class MessageModule : InteractionModuleBase<SocketInteractionContext>
     
     [SlashCommand("prune", "Prune messages from recent until a specific date")]
     [DefaultMemberPermissions(GuildPermission.Administrator)]
-    [EnabledInDm(false)]
+    [CommandContextType(InteractionContextType.Guild)]
     public async Task PruneMessages(string dateTo, bool ignoreFirstMessage = true)
     {
         await DeferAsync();
