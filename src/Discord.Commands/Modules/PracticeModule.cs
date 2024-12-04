@@ -9,6 +9,12 @@ namespace Discord.Commands.Modules;
 public sealed partial class PracticeModule : InteractionModuleBase<SocketInteractionContext>
 {
     private readonly ILogger<PracticeModule> _logger;
+    private static readonly List<IEmote> NotifyEmojis =
+    [
+        new Emoji("\u2705"),    // ✅ White check mark
+        new Emoji("\u2753")     // ❓ Question mark
+    ];
+
 
     public PracticeModule(ILogger<PracticeModule> logger)
     {
@@ -39,13 +45,16 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
         var formattedQualifying = GetFormattedQualifyingFormat(qualifyingFormat);
         var formattedRace = GetFormattedRaceFormat(raceFormat);
 
-        // Add the comment in cursive with a blank line above it if it exists
         var commentMessage = !string.IsNullOrEmpty(comment) ? $"\n\n*{comment}*" : "";
 
         var message = ComposeFinalMessage(date, driversRequired, roles, flagEmoji, formattedTrackName,
             formattedTimeSlot, formattedQualifying, formattedRace, commentMessage);
 
-        var followupMessage = await FollowupAsync(message, allowedMentions: AllowedMentions.All);
+        var components = new ComponentBuilder()
+            .WithButton("Zrušit trénink", "cancel_training", ButtonStyle.Danger)
+            .Build();
+
+        var followupMessage = await FollowupAsync(message, components: components, allowedMentions: AllowedMentions.All);
 
         var checkMark = new Emoji("\u2705");
         var questionMark = new Emoji("\u2753");
@@ -53,6 +62,7 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
         await followupMessage.AddReactionAsync(checkMark);
         await followupMessage.AddReactionAsync(questionMark);
     }
+
 
     private static string ComposeFinalMessage(string date, int driversRequired, IEnumerable<SocketRole> roles,
         string flagEmoji, string formattedTrackName, string formattedTimeSlot, string formattedQualifying,
@@ -73,6 +83,62 @@ Dobrovolná účast, prosím potvrď
 Trénink proběhne při účasti alespoň {driversRequired} pilotů
 {commentMessage}
 ";
+    }
+    
+    [ComponentInteraction("cancel_training")]
+    public async Task CancelTraining()
+    {
+        await UpdateMessageAsCanceled();
+        await NotifyReactingUsers();
+    }
+    
+    private async Task NotifyReactingUsers()
+    {
+        var interaction = (IComponentInteraction)Context.Interaction;
+        var message = interaction.Message;
+
+        var notifiedUsers = new List<string>();
+
+        foreach (var emoji in NotifyEmojis)
+        {
+            var users = await message.GetReactionUsersAsync(emoji, int.MaxValue).FlattenAsync();
+
+            foreach (var user in users)
+            {
+                if (user.IsBot || notifiedUsers.Contains(user.Username))
+                    continue;
+
+                try
+                {
+                    await NotifyUser(user);
+                    notifiedUsers.Add(user.Username);
+                }
+                catch
+                {
+                    // ignore errors
+                }
+            }
+        }
+    }
+
+    private async Task NotifyUser(IUser user)
+    {
+        var dmChannel = await user.CreateDMChannelAsync();
+
+        await dmChannel.SendMessageAsync(
+            $"Čau {user.Username}, někdo právě zrušil trénink na GRL, tak se nelekej. Klidně založ svůj. Stačí vlézt do [#treninkove-registrace](https://discord.com/channels/706625870269251625/1294748282265927762) a založit vlastní.");
+    }
+
+    private async Task UpdateMessageAsCanceled()
+    {
+        var interaction = (IComponentInteraction)Context.Interaction;
+        var message = interaction.Message;
+
+        await message.ModifyAsync(msg =>
+        {
+            msg.Content = "🚫 **TRÉNINK ZRUŠEN**";
+            msg.Components = new ComponentBuilder().Build();
+        });
     }
 
     private static string PingRoles(IEnumerable<SocketRole> roles)
