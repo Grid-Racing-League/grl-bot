@@ -27,7 +27,12 @@ public sealed class InteractionHandlingService : IHostedService
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        _client.Ready += () => _commands.RegisterCommandsGloballyAsync();
+        _client.Ready += async () =>
+        {
+            await _commands.RegisterCommandsGloballyAsync();
+            _logger.LogInformation("Commands registered globally.");
+        };
+
         _client.InteractionCreated += OnInteractionAsync;
 
         _logger.LogInformation("Registering commands...");
@@ -52,12 +57,18 @@ public sealed class InteractionHandlingService : IHostedService
         try
         {
             var context = new SocketInteractionContext(_client, interaction);
+
+            // Execute the interaction command and log results
             var result = await _commands.ExecuteCommandAsync(context, _services);
 
             if (result.IsSuccess is false)
             {
-                _logger.LogError("Error handling interaction: {ErrorMessage}", result.ToString());
-                await context.Channel.SendMessageAsync(result.ToString());
+                _logger.LogError("Error handling interaction: {ErrorMessage}", result.ErrorReason);
+
+                if (interaction is SocketMessageComponent)
+                {
+                    await interaction.RespondAsync($"An error occurred: {result.ErrorReason}", ephemeral: true);
+                }
             }
         }
         catch (Exception e)
@@ -66,18 +77,27 @@ public sealed class InteractionHandlingService : IHostedService
 
             if (interaction.Type is InteractionType.ApplicationCommand)
             {
-                await interaction.GetOriginalResponseAsync().ContinueWith(async msg => await msg.Result.DeleteAsync());
+                try
+                {
+                    var response = await interaction.GetOriginalResponseAsync();
+                    await response.DeleteAsync();
+                }
+                catch
+                {
+                    // Ignore deletion errors
+                }
             }
-
-            throw;
         }
     }
 
-    private Task InteractionExecutedAsync(ICommandInfo commandInfo, IInteractionContext interactionContext,
+    private Task InteractionExecutedAsync(ICommandInfo? commandInfo, IInteractionContext interactionContext,
         Interactions.IResult result)
     {
-        _logger.LogInformation("Interaction command executed: {CommandName}. Server: {Server}. User: {User}",
-            commandInfo.Name, interactionContext.Guild?.Name, interactionContext.User?.Username);
+        _logger.LogInformation("Interaction executed: {CommandName}. Server: {Server}. User: {User}",
+            commandInfo?.Name ?? "Unknown",
+            interactionContext.Guild?.Name ?? "Direct Message",
+            interactionContext.User?.Username ?? "Unknown");
+
         return Task.CompletedTask;
     }
 }
