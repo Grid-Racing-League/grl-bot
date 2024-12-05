@@ -9,6 +9,7 @@ namespace Discord.Commands.Modules;
 public sealed partial class PracticeModule : InteractionModuleBase<SocketInteractionContext>
 {
     private readonly ILogger<PracticeModule> _logger;
+    private static readonly Dictionary<ulong, ulong> MessageCreators = new();
     private static readonly List<IEmote> NotifyEmojis =
     [
         new Emoji("\u2705"),    // ✅ White check mark
@@ -55,6 +56,7 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
             .Build();
 
         var followupMessage = await FollowupAsync(message, components: components, allowedMentions: AllowedMentions.All);
+        MessageCreators[followupMessage.Id] = Context.User.Id;
 
         var checkMark = new Emoji("\u2705");
         var questionMark = new Emoji("\u2753");
@@ -88,8 +90,22 @@ Trénink proběhne při účasti alespoň {driversRequired} pilotů
     [ComponentInteraction("cancel_training")]
     public async Task CancelTraining()
     {
-        await UpdateMessageAsCanceled();
+        var interaction = (IComponentInteraction)Context.Interaction;
+        var messageId = interaction.Message.Id;
+
+        var message = interaction.Message;
+
+        var creatorUserId = MessageCreators.GetValueOrDefault(messageId);
+
+        if (Context.User.Id != creatorUserId)
+        {
+            await RespondAsync("Tenhle trénink nemůžeš zrušit.", ephemeral: true);
+            return;
+        }
+
+        await UpdateMessageAsCanceled(message);
         await NotifyReactingUsers();
+        MessageCreators.Remove(messageId);
     }
     
     private async Task NotifyReactingUsers()
@@ -129,11 +145,8 @@ Trénink proběhne při účasti alespoň {driversRequired} pilotů
             $"Čau {user.Username}, někdo právě zrušil trénink na GRL, tak se nelekej. Klidně založ svůj. Stačí vlézt do [#treninkove-registrace](https://discord.com/channels/706625870269251625/1294748282265927762) a založit vlastní.");
     }
 
-    private async Task UpdateMessageAsCanceled()
+    private async Task UpdateMessageAsCanceled(IUserMessage message)
     {
-        var interaction = (IComponentInteraction)Context.Interaction;
-        var message = interaction.Message;
-
         await message.ModifyAsync(msg =>
         {
             msg.Content = "🚫 **TRÉNINK ZRUŠEN**";
