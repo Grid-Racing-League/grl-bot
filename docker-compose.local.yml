@@ -7,6 +7,7 @@ services:
       dockerfile: ./src/ConsoleApp/Dockerfile
     environment:
       - DOTNET_ENVIRONMENT=Development
+      - ConnectionStrings__Database=Host=grl-bot-db;Port=5432;Database=grl-bot;Username=admin;Password=pwd;
     restart: unless-stopped
     networks:
       - grl-bot-network

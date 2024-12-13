@@ -16,7 +16,7 @@ jobs:
       - name: Inject Secrets into appsettings.json
         run: |
           sed -i 's|<DISCORD_BOT_TOKEN>|'"${{ secrets.DISCORD_BOT_TOKEN }}"'|g' src/ConsoleApp/appsettings.json
-          sed -i 's|<MONGO_DB_CONNECTION_STRING>|'"${{ secrets.MONGO_DB_CONNECTION_STRING }}"'|g' src/ConsoleApp/appsettings.json
+          sed -i 's|<DB_CONNECTION_STRING>|'"${{ secrets.DB_CONNECTION_STRING }}"'|g' src/ConsoleApp/appsettings.json
 
       - name: Set Timestamp Tag for Docker Image
         run: echo "IMAGE_TAG=$(date +'%Y%m%d-%H%M')" >> $GITHUB_ENV
@@ -33,9 +33,9 @@ jobs:
       - name: Prepare Docker Compose File
         run: |
           sed -i 's|<IMAGE_TAG>|'"${{ env.IMAGE_TAG }}"'|g' docker-compose.yml
-          sed -i 's|<MONGO_DB_USERNAME>|'"${{ secrets.MONGO_DB_USERNAME }}"'|g' docker-compose.yml
-          sed -i 's|<MONGO_DB_PASSWORD>|'"${{ secrets.MONGO_DB_PASSWORD }}"'|g' docker-compose.yml
-          sed -i 's|<MONGO_DB_NAME>|'"${{ secrets.MONGO_DB_NAME }}"'|g' docker-compose.yml
+          sed -i 's|<POSTGRES_DB>|'"${{ secrets.POSTGRES_DB }}"'|g' docker-compose.yml
+          sed -i 's|<POSTGRES_USER>|'"${{ secrets.POSTGRES_USER }}"'|g' docker-compose.yml
+          sed -i 's|<POSTGRES_PASSWORD>|'"${{ secrets.POSTGRES_PASSWORD }}"'|g' docker-compose.yml
 
       - name: Upload Docker Artifacts
         uses: actions/upload-artifact@v4

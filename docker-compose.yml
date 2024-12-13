@@ -11,17 +11,16 @@
       - grl-bot-db
 
   grl-bot-db:
-    image: mongo:6.0
-    platform: linux/x86_64
+    image: postgres:15-alpine
     container_name: grl-bot-db
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=<MONGO_DB_USERNAME>
-      - MONGO_INITDB_ROOT_PASSWORD=<MONGO_DB_PASSWORD>
-      - MONGO_INITDB_DATABASE=<MONGO_DB_NAME>
+      - POSTGRES_DB=<POSTGRES_DB>
+      - POSTGRES_USER=<POSTGRES_USER>
+      - POSTGRES_PASSWORD=<POSTGRES_PASSWORD>
     volumes:
       - grl_bot_db_data:/data/db
     ports:
-      - "5555:27017"
+      - "5555:5432"
     restart: unless-stopped
     networks:
       - grl-bot-network
