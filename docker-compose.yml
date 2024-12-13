@@ -1,0 +1,35 @@
+﻿services:
+  host:
+    image: grl-bot:<IMAGE_TAG>
+    container_name: grl-bot
+    environment:
+      - DOTNET_ENVIRONMENT=Production
+    restart: unless-stopped
+    networks:
+      - grl-bot-network
+    depends_on:
+      - grl-bot-db
+
+  grl-bot-db:
+    image: mongo:6.0
+    container_name: grl-bot-db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=<MONGO_DB_USERNAME>
+      - MONGO_INITDB_ROOT_PASSWORD=<MONGO_DB_PASSWORD>
+      - MONGO_INITDB_DATABASE=<MONGO_DB_NAME>
+    volumes:
+      - grl_bot_db_data:/data/db
+    ports:
+      - "5555:27017"
+    restart: unless-stopped
+    networks:
+      - grl-bot-network
+
+networks:
+  grl-bot-network:
+    name: grl-bot-network
+    driver: bridge
+
+volumes:
+  grl_bot_db_data:
+    driver: local
