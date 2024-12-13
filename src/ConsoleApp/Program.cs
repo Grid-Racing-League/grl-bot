@@ -1,4 +1,5 @@
-﻿using ConsoleApp.Extensions;
+﻿using Application.Extensions;
+using ConsoleApp.Extensions;
 using Discord.BotConfiguration.Extensions;
 using Discord.Commands.Extensions;
 using Microsoft.Extensions.Configuration;
@@ -19,6 +20,7 @@ builder.ConfigureAppConfiguration(config =>
 builder.ConfigureServices((hostBuilder, services) =>
 {
     services.AddPersistence(hostBuilder.Configuration);
+    services.AddApplication();
 
     // The sequence of these calls is crucial due to assembly scanning, and they should be placed at the end.
     services.AddDiscordBotConfiguration(hostBuilder.Configuration);

@@ -1,28 +1,25 @@
 ﻿using Discord.Interactions;
 using Microsoft.Extensions.Logging;
-using System.Reflection;
 using System.Text.RegularExpressions;
-using Discord.WebSocket;
-using Domain;
-using Domain.Repositories;
+using Application.Services;
+using Discord.Commands.Modules.Helpers;
 
 namespace Discord.Commands.Modules;
 
 public sealed partial class PracticeModule : InteractionModuleBase<SocketInteractionContext>
 {
     private readonly ILogger<PracticeModule> _logger;
-    private readonly ITrainingSessionRepository _trainingSessionRepository;
-    private static readonly List<IEmote> NotifyEmojis =
-    [
-        new Emoji("\u2705"),    // ✅ White check mark
-        new Emoji("\u2753")     // ❓ Question mark
-    ];
+    private readonly ITrainingSessionService _trainingSessionService;
+    private readonly IUserNotificationService _userNotificationService;
 
-
-    public PracticeModule(ILogger<PracticeModule> logger, ITrainingSessionRepository trainingSessionRepository)
+    public PracticeModule(
+        ILogger<PracticeModule> logger,
+        ITrainingSessionService trainingSessionService,
+        IUserNotificationService userNotificationService)
     {
         _logger = logger;
-        _trainingSessionRepository = trainingSessionRepository;
+        _trainingSessionService = trainingSessionService;
+        _userNotificationService = userNotificationService;
     }
 
     [SlashCommand("practice", "Create a practice")]
@@ -40,200 +37,56 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
 
         var roles = Context.Guild.Roles
             .Where(r =>
-                r.Name.Contains($"{role}", StringComparison.InvariantCultureIgnoreCase) &&
+                r.Name.Contains(role.ToString(), StringComparison.InvariantCultureIgnoreCase) &&
                 r.Name.Contains("Driver", StringComparison.InvariantCultureIgnoreCase));
 
-        var flagEmoji = GetFlagEmoji(track);
-        var formattedTrackName = GetFormattedTrackName(track);
-        var formattedTimeSlot = GetFormattedTimeSlot(time);
-        var formattedQualifying = GetFormattedQualifyingFormat(qualifyingFormat);
-        var formattedRace = GetFormattedRaceFormat(raceFormat);
+        var messageContent = PracticeHelpers.CreateTrainingMessage(
+            track, date, time, driversRequired, role, qualifyingFormat, raceFormat, roles, comment
+        );
 
-        var commentMessage = !string.IsNullOrEmpty(comment) ? $"\n\n*{comment}*" : "";
+        var components = PracticeHelpers.BuildActionComponents();
 
-        var message = ComposeFinalMessage(date, driversRequired, roles, flagEmoji, formattedTrackName,
-            formattedTimeSlot, formattedQualifying, formattedRace, commentMessage);
+        var followupMessage =
+            await FollowupAsync(messageContent, components: components, allowedMentions: AllowedMentions.All);
 
-        var components = new ComponentBuilder()
-            .WithButton("Zrušit trénink", "cancel_training", ButtonStyle.Danger)
-            .Build();
+        await _trainingSessionService.RegisterNewSessionAsync(followupMessage.Id, Context.User.Id, Context.Guild?.Id,
+            Context.Channel?.Id);
 
-        var followupMessage = await FollowupAsync(message, components: components, allowedMentions: AllowedMentions.All);
-
-        await _trainingSessionRepository.AddAsync(new TrainingSession
-        {
-            MessageId = followupMessage.Id,
-            CreatorId = Context.User.Id,
-            GuildId = Context.Guild?.Id,
-            ChannelId = Context.Channel?.Id
-        });
-
-        var checkMark = new Emoji("\u2705");
-        var questionMark = new Emoji("\u2753");
-
-        await followupMessage.AddReactionAsync(checkMark);
-        await followupMessage.AddReactionAsync(questionMark);
+        await PracticeHelpers.AddSessionReactionsAsync(followupMessage);
     }
 
-
-    private static string ComposeFinalMessage(string date, int driversRequired, IEnumerable<SocketRole> roles,
-        string flagEmoji, string formattedTrackName, string formattedTimeSlot, string formattedQualifying,
-        string formattedRace, string commentMessage)
-    {
-        return $@"
-{flagEmoji} {formattedTrackName} - trénink {flagEmoji} 
-
-🕗 {date} {formattedTimeSlot} 🕗
-
-🏎️  {formattedQualifying} Q - {formattedRace} Race 🏎️
-
-🛠️ Ligový assisty 🛠️
-
-{PingRoles(roles)}
-
-Dobrovolná účast, prosím potvrď
-Trénink proběhne při účasti alespoň {driversRequired} pilotů
-{commentMessage}
-";
-    }
-    
     [ComponentInteraction("cancel_training")]
     public async Task CancelTraining()
     {
         var interaction = (IComponentInteraction)Context.Interaction;
         var messageId = interaction.Message.Id;
+        var userId = interaction.User.Id;
 
-        var message = interaction.Message;
+        var cancellationResult = await _trainingSessionService.CancelSessionAsync(messageId, userId);
 
-        var session = await _trainingSessionRepository.GetByMessageIdAsync(messageId);
-        
-        if (session is null)
+        if (!cancellationResult.IsSuccessful)
         {
-            await RespondAsync("Tenhle trénink neexistuje nebo už byl zrušen.", ephemeral: true);
+            await RespondAsync(cancellationResult.ErrorMessage, ephemeral: true);
             return;
         }
 
-        if (Context.User.Id != session.CreatorId)
-        {
-            await RespondAsync("Tenhle trénink nemůžeš zrušit.", ephemeral: true);
-            return;
-        }
+        await PracticeHelpers.MarkPracticeMessageAsCanceledAsync(interaction.Message);
 
-        await UpdateMessageAsCanceled(message);
-        await NotifyReactingUsers();
-        await _trainingSessionRepository.RemoveAsync(messageId);
-    }
-    
-    private async Task NotifyReactingUsers()
-    {
-        var interaction = (IComponentInteraction)Context.Interaction;
-        var message = interaction.Message;
+        List<Emoji> emojis =
+        [
+            new Emoji("\u2705"), // ✅
+            new Emoji("\u2753") // ❓
+        ];
 
-        var notifiedUsers = new List<string>();
+        var users = (await Task.WhenAll(emojis.Select(e =>
+                interaction.Message.GetReactionUsersAsync(e, int.MaxValue).FlattenAsync())))
+            .SelectMany(u => u)
+            .DistinctBy(u => u.Id);
 
-        foreach (var emoji in NotifyEmojis)
-        {
-            var users = await message.GetReactionUsersAsync(emoji, int.MaxValue).FlattenAsync();
+        var notificationMessage =
+            "Trénink na GRL zrušený. Klidně založ svůj vlastní v kanálu pro tréninkové registrace.";
 
-            foreach (var user in users)
-            {
-                if (user.IsBot || notifiedUsers.Contains(user.Username))
-                    continue;
-
-                try
-                {
-                    await NotifyUser(user);
-                    notifiedUsers.Add(user.Username);
-                }
-                catch
-                {
-                    // ignore errors
-                }
-            }
-        }
-    }
-
-    private async Task NotifyUser(IUser user)
-    {
-        var dmChannel = await user.CreateDMChannelAsync();
-
-        await dmChannel.SendMessageAsync(
-            $"Čau {user.Username}, někdo právě zrušil trénink na GRL, tak se nelekej. Klidně založ svůj. Stačí vlézt do [#treninkove-registrace](https://discord.com/channels/706625870269251625/1294748282265927762) a založit vlastní.");
-    }
-
-    private async Task UpdateMessageAsCanceled(IUserMessage message)
-    {
-        await message.ModifyAsync(msg =>
-        {
-            msg.Content = "🚫 **TRÉNINK ZRUŠEN**";
-            msg.Components = new ComponentBuilder().Build();
-        });
-    }
-
-    private static string PingRoles(IEnumerable<SocketRole> roles)
-    {
-        return string.Join(" ", roles.Select(r => r.Mention));
-    }
-
-    // Method to return a properly formatted track name based on the ChoiceDisplay attribute
-    private static string GetFormattedTrackName(Tracks track)
-    {
-        var trackInfo = track.GetType().GetField(track.ToString());
-        var choiceDisplayAttr = trackInfo?.GetCustomAttribute<ChoiceDisplayAttribute>();
-        return choiceDisplayAttr?.Name ?? track.ToString();
-    }
-
-    private static string GetFormattedTimeSlot(TimeSlots time)
-    {
-        var timeInfo = time.GetType().GetField(time.ToString());
-        var choiceDisplayAttr = timeInfo?.GetCustomAttribute<ChoiceDisplayAttribute>();
-        return choiceDisplayAttr?.Name ?? time.ToString();
-    }
-
-    // Method to get formatted race format
-    private static string GetFormattedRaceFormat(RaceFormat format)
-    {
-        var formatInfo = format.GetType().GetField(format.ToString());
-        var choiceDisplayAttr = formatInfo?.GetCustomAttribute<ChoiceDisplayAttribute>();
-        return choiceDisplayAttr?.Name ?? format.ToString();
-    }
-
-    // Method to get formatted qualifying format
-    private static string GetFormattedQualifyingFormat(QualifyingFormat format)
-    {
-        var formatInfo = format.GetType().GetField(format.ToString());
-        var choiceDisplayAttr = formatInfo?.GetCustomAttribute<ChoiceDisplayAttribute>();
-        return choiceDisplayAttr?.Name ?? format.ToString();
-    }
-
-    private static string GetFlagEmoji(Tracks track)
-    {
-        return track switch
-        {
-            Tracks.Bahrain => ":flag_bh:",
-            Tracks.Jeddah => ":flag_sa:",
-            Tracks.Australia => ":flag_au:",
-            Tracks.Japan => ":flag_jp:",
-            Tracks.China => ":flag_cn:",
-            Tracks.Miami => ":flag_us:",
-            Tracks.Imola => ":flag_it:",
-            Tracks.Monaco => ":flag_mc:",
-            Tracks.Canada => ":flag_ca:",
-            Tracks.Spain => ":flag_es:",
-            Tracks.Austria => ":flag_at:",
-            Tracks.GreatBritain => ":flag_gb:",
-            Tracks.Hungary => ":flag_hu:",
-            Tracks.Belgium => ":flag_be:",
-            Tracks.Netherlands => ":flag_nl:",
-            Tracks.Monza => ":flag_it:",
-            Tracks.Azerbaijan => ":flag_az:",
-            Tracks.Singapore => ":flag_sg:",
-            Tracks.Texas => ":flag_us:",
-            Tracks.Mexico => ":flag_mx:",
-            Tracks.LasVegas => ":flag_us:",
-            Tracks.AbuDhabi => ":flag_ae:",
-            _ => throw new ArgumentOutOfRangeException(nameof(track), track, message: null)
-        };
+        await _userNotificationService.NotifyUsersAsync(users, notificationMessage);
     }
 
     public enum Tracks

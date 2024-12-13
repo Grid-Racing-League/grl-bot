@@ -19,7 +19,6 @@ internal sealed class TrainingSessionRepository : ITrainingSessionRepository
         model.Id = Guid.NewGuid();
         model.CreatedAt = DateTime.UtcNow;
         await _context.TrainingSessions.AddAsync(model);
-        await _context.SaveChangesAsync();
     }
 
     public async Task<Domain.TrainingSession?> GetByMessageIdAsync(ulong messageId)
@@ -41,6 +40,11 @@ internal sealed class TrainingSessionRepository : ITrainingSessionRepository
         }
 
         _context.TrainingSessions.Remove(model);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task SaveChangesAsync()
+    {
         await _context.SaveChangesAsync();
     }
 }
