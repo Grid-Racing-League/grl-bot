@@ -14,16 +14,16 @@ services:
       - grl-bot-db
   
   grl-bot-db:
-    image: mongo:6.0
+    image: postgres:15-alpine
     container_name: grl-bot-db
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=admin
-      - MONGO_INITDB_ROOT_PASSWORD=pwd
-      - MONGO_INITDB_DATABASE=grl-bot
+      - POSTGRES_DB=grl-bot
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=pwd
     volumes:
       - grl_bot_db_data:/data/db
     ports:
-      - "5555:27017"   # Use localhost:5555 to connect from data sources
+      - "5555:5432"   # Use localhost:5555 to connect from data sources
     restart: unless-stopped
     networks:
       - grl-bot-network

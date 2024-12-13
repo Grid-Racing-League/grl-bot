@@ -1,26 +1,45 @@
-﻿using MongoDB.Bson;
-using MongoDB.Bson.Serialization.Attributes;
+﻿using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Persistence.Models;
 
-internal sealed class TrainingSession
+internal sealed class TrainingSession : IEntityTypeConfiguration<TrainingSession>
 {
-    [BsonId]
-    [BsonRepresentation(BsonType.ObjectId)]
-    public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
+    [Key]
+    public Guid Id { get; set; }
 
-    [BsonElement("MessageId")]
     public ulong MessageId { get; set; }
 
-    [BsonElement("CreatorId")]
     public ulong CreatorId { get; set; }
 
-    [BsonElement("CreatedAt")]
     public DateTime CreatedAt { get; set; }
 
-    [BsonElement("GuildId")]
     public ulong? GuildId { get; set; }
 
-    [BsonElement("ChannelId")]
     public ulong? ChannelId { get; set; }
+
+    public void Configure(EntityTypeBuilder<TrainingSession> builder)
+    {
+        builder.HasKey(ts => ts.Id);
+
+        builder.Property(rc => rc.Id)
+            .ValueGeneratedNever();
+
+        builder.Property(rc => rc.MessageId)
+            .IsRequired()
+            .ValueGeneratedNever();
+
+        builder.Property(rc => rc.CreatedAt)
+            .IsRequired()
+            .ValueGeneratedNever();
+
+        builder.Property(rc => rc.GuildId)
+            .IsRequired(required: false)
+            .ValueGeneratedNever();
+
+        builder.Property(rc => rc.ChannelId)
+            .IsRequired(required: false)
+            .ValueGeneratedNever();
+    }
 }

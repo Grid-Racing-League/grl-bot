@@ -1,7 +1,7 @@
 ﻿using Domain.Repositories;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using MongoDB.Driver;
 using Persistence.Repositories;
 
 namespace Persistence.Extensions;
@@ -10,25 +10,13 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddPersistence(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddMongoDb(configuration);
+        services.AddDbContextFactory<GrlBotDbContext>(opt =>
+        {
+            var connectionString = configuration.GetConnectionString("Database");
+            opt.UseNpgsql(connectionString);
+        });
 
         services.AddTransient<ITrainingSessionRepository, TrainingSessionRepository>();
-
-        return services;
-    }
-
-    private static IServiceCollection AddMongoDb(this IServiceCollection services, IConfiguration configuration)
-    {
-        var mongoSettings = MongoClientSettings.FromConnectionString(configuration.GetConnectionString("Database"));
-        var mongoClient = new MongoClient(mongoSettings);
-
-        services.AddSingleton<IMongoClient>(mongoClient);
-
-        services.AddSingleton(_ =>
-        {
-            var databaseName = "grl-bot";
-            return new GrlBotDbContext(mongoClient, databaseName);
-        });
 
         return services;
     }
