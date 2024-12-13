@@ -12,6 +12,9 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
     private readonly ITrainingSessionService _trainingSessionService;
     private readonly IUserNotificationService _userNotificationService;
 
+    // Temporary in-memory storage for parameters until roles are selected
+    private static readonly Dictionary<ulong, PracticeData> PendingPracticeData = new();
+
     public PracticeModule(
         ILogger<PracticeModule> logger,
         ITrainingSessionService trainingSessionService,
@@ -28,31 +31,87 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
         string date,
         TimeSlots time,
         int driversRequired,
-        Roles role,
         QualifyingFormat qualifyingFormat,
         RaceFormat raceFormat,
         string? comment = null)
     {
-        await DeferAsync();
+        await DeferAsync(ephemeral: true);
 
-        var roles = Context.Guild.Roles
-            .Where(r =>
-                r.Name.Contains(role.ToString(), StringComparison.InvariantCultureIgnoreCase) &&
-                r.Name.Contains("Driver", StringComparison.InvariantCultureIgnoreCase));
+        PendingPracticeData[Context.User.Id] = new PracticeData
+        {
+            Track = track,
+            Date = date,
+            Time = time,
+            DriversRequired = driversRequired,
+            QualifyingFormat = qualifyingFormat,
+            RaceFormat = raceFormat,
+            Comment = comment
+        };
 
-        var messageContent = PracticeHelpers.CreateTrainingMessage(
-            track, date, time, driversRequired, role, qualifyingFormat, raceFormat, roles, comment
+        var driverRoles = Context.Guild.Roles
+            .Where(r => r.Name.Contains("Driver", StringComparison.InvariantCultureIgnoreCase))
+            .ToList();
+
+        if (driverRoles.Count is 0)
+        {
+            await FollowupAsync("Žádné role k výběru nenalezeny.", ephemeral: true);
+            PendingPracticeData.Remove(Context.User.Id);
+            return;
+        }
+
+        var selectMenu = new SelectMenuBuilder()
+            .WithCustomId("role_select_menu")
+            .WithPlaceholder("Vyber role pro ping")
+            .WithMinValues(minValues: 1)
+            .WithMaxValues(driverRoles.Count);
+
+        foreach (var role in driverRoles)
+        {
+            selectMenu.AddOption(role.Name, role.Id.ToString());
+        }
+
+        var builder = new ComponentBuilder().WithSelectMenu(selectMenu);
+        await FollowupAsync("Vyber prosím role, které chceš pingnout:", components: builder.Build(), ephemeral: true);
+    }
+
+    [ComponentInteraction("role_select_menu")]
+    public async Task HandleRoleSelection(string[] selectedRoles)
+    {
+        await DeferAsync(ephemeral: true);
+        
+        if (!PendingPracticeData.TryGetValue(Context.User.Id, out var data))
+        {
+            await FollowupAsync("Data pro trénink nenalezena. Prosím spusť /practice znovu.", ephemeral: true);
+            return;
+        }
+
+        var roles = selectedRoles
+            .Select(id => Context.Guild.GetRole(ulong.Parse(id)))
+            .Where(r => r != null)
+            .ToList();
+
+        var messageContent = PracticeHelpers.CreateTrainingMessage(data.Track, data.Date, data.Time,
+            data.DriversRequired, data.QualifyingFormat, data.RaceFormat, roles,
+            data.Comment
         );
 
         var components = PracticeHelpers.BuildActionComponents();
 
-        var followupMessage =
-            await FollowupAsync(messageContent, components: components, allowedMentions: AllowedMentions.All);
+        var publicMessage = await Context.Channel.SendMessageAsync(messageContent, components: components,
+            allowedMentions: AllowedMentions.All);
 
-        await _trainingSessionService.RegisterNewSessionAsync(followupMessage.Id, Context.User.Id, Context.Guild?.Id,
+        await _trainingSessionService.RegisterNewSessionAsync(publicMessage.Id, Context.User.Id, Context.Guild?.Id,
             Context.Channel?.Id);
 
-        await PracticeHelpers.AddSessionReactionsAsync(followupMessage);
+        await PracticeHelpers.AddSessionReactionsAsync(publicMessage);
+
+        PendingPracticeData.Remove(Context.User.Id);
+
+        await ((IComponentInteraction)Context.Interaction).UpdateAsync(msg =>
+        {
+            msg.Content = "Role vybrány! Trénink vytvořen.";
+            msg.Components = new ComponentBuilder().Build();
+        });
     }
 
     [ComponentInteraction("cancel_training")]
@@ -132,17 +191,6 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
         [ChoiceDisplay("Full")] Full
     }
 
-    [Flags]
-    public enum Roles
-    {
-        [ChoiceDisplay("Rookie")] Rookie = 1,
-        [ChoiceDisplay("Junior")] Junior = 2,
-        [ChoiceDisplay("Talent")] Talent = 4,
-        [ChoiceDisplay("Academy")] Academy = 8,
-        [ChoiceDisplay("Main")] Main = 16,
-        [ChoiceDisplay("Driver")] Driver = 32
-    }
-
     public enum TimeSlots
     {
         [ChoiceDisplay("Upřesníme později")] Tba,
@@ -165,4 +213,15 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
 
     [GeneratedRegex(@"\s")]
     private static partial Regex MyRegex();
+
+    private class PracticeData
+    {
+        public Tracks Track { get; set; }
+        public string Date { get; set; } = null!;
+        public TimeSlots Time { get; set; }
+        public int DriversRequired { get; set; }
+        public QualifyingFormat QualifyingFormat { get; set; }
+        public RaceFormat RaceFormat { get; set; }
+        public string? Comment { get; set; }
+    }
 }

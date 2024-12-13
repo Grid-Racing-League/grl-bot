@@ -12,7 +12,6 @@ internal static class PracticeHelpers
         string date,
         PracticeModule.TimeSlots time,
         int driversRequired,
-        PracticeModule.Roles role,
         PracticeModule.QualifyingFormat qualifyingFormat,
         PracticeModule.RaceFormat raceFormat,
         IEnumerable<SocketRole> roles,
