@@ -26,6 +26,7 @@
 	<ItemGroup>
 		<ProjectReference Include="..\Discord.Commands\Discord.Commands.csproj"/>
 		<ProjectReference Include="..\Discord.BotConfiguration\Discord.BotConfiguration.csproj"/>
+		<ProjectReference Include="..\Persistence\Persistence.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

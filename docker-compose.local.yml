@@ -1,0 +1,38 @@
+﻿name: discord-bot-development
+services:
+  host:
+    image: grl-bot-app
+    build:
+      context: .
+      dockerfile: ./src/ConsoleApp/Dockerfile
+    environment:
+      - DOTNET_ENVIRONMENT=Development
+    restart: unless-stopped
+    networks:
+      - grl-bot-network
+    depends_on:
+      - grl-bot-db
+  
+  grl-bot-db:
+    image: mongo:6.0
+    container_name: grl-bot-db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=pwd
+      - MONGO_INITDB_DATABASE=grl-bot
+    volumes:
+      - grl_bot_db_data:/data/db
+    ports:
+      - "5555:27017"   # Use localhost:5555 to connect from data sources
+    restart: unless-stopped
+    networks:
+      - grl-bot-network
+
+networks:
+  grl-bot-network:
+    name: grl-bot-network
+    driver: bridge
+
+volumes:
+  grl_bot_db_data:
+    driver: local

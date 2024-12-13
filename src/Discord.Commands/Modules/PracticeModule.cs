@@ -3,13 +3,15 @@ using Microsoft.Extensions.Logging;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using Discord.WebSocket;
+using Domain;
+using Domain.Repositories;
 
 namespace Discord.Commands.Modules;
 
 public sealed partial class PracticeModule : InteractionModuleBase<SocketInteractionContext>
 {
     private readonly ILogger<PracticeModule> _logger;
-    private static readonly Dictionary<ulong, ulong> MessageCreators = new();
+    private readonly ITrainingSessionRepository _trainingSessionRepository;
     private static readonly List<IEmote> NotifyEmojis =
     [
         new Emoji("\u2705"),    // ✅ White check mark
@@ -17,9 +19,10 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
     ];
 
 
-    public PracticeModule(ILogger<PracticeModule> logger)
+    public PracticeModule(ILogger<PracticeModule> logger, ITrainingSessionRepository trainingSessionRepository)
     {
         _logger = logger;
+        _trainingSessionRepository = trainingSessionRepository;
     }
 
     [SlashCommand("practice", "Create a practice")]
@@ -56,7 +59,14 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
             .Build();
 
         var followupMessage = await FollowupAsync(message, components: components, allowedMentions: AllowedMentions.All);
-        MessageCreators[followupMessage.Id] = Context.User.Id;
+
+        await _trainingSessionRepository.AddAsync(new TrainingSession
+        {
+            MessageId = followupMessage.Id,
+            CreatorId = Context.User.Id,
+            GuildId = Context.Guild?.Id,
+            ChannelId = Context.Channel?.Id
+        });
 
         var checkMark = new Emoji("\u2705");
         var questionMark = new Emoji("\u2753");
@@ -95,9 +105,15 @@ Trénink proběhne při účasti alespoň {driversRequired} pilotů
 
         var message = interaction.Message;
 
-        var creatorUserId = MessageCreators.GetValueOrDefault(messageId);
+        var session = await _trainingSessionRepository.GetByMessageIdAsync(messageId);
+        
+        if (session is null)
+        {
+            await RespondAsync("Tenhle trénink neexistuje nebo už byl zrušen.", ephemeral: true);
+            return;
+        }
 
-        if (Context.User.Id != creatorUserId)
+        if (Context.User.Id != session.CreatorId)
         {
             await RespondAsync("Tenhle trénink nemůžeš zrušit.", ephemeral: true);
             return;
@@ -105,7 +121,7 @@ Trénink proběhne při účasti alespoň {driversRequired} pilotů
 
         await UpdateMessageAsCanceled(message);
         await NotifyReactingUsers();
-        MessageCreators.Remove(messageId);
+        await _trainingSessionRepository.RemoveAsync(messageId);
     }
     
     private async Task NotifyReactingUsers()
