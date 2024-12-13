@@ -12,6 +12,7 @@
 
   grl-bot-db:
     image: mongo:6.0
+    platform: linux/x86_64
     container_name: grl-bot-db
     environment:
       - MONGO_INITDB_ROOT_USERNAME=<MONGO_DB_USERNAME>
