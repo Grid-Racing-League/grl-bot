@@ -1,6 +1,6 @@
 ﻿using Discord.Interactions;
+using Discord.WebSocket;
 using Microsoft.Extensions.Logging;
-using System.Text.RegularExpressions;
 using Application.Services;
 using Discord.Commands.Modules.Helpers;
 
@@ -37,6 +37,7 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
     {
         await DeferAsync(ephemeral: true);
 
+        // Store initial data
         PendingPracticeData[Context.User.Id] = new PracticeData
         {
             Track = track,
@@ -52,33 +53,32 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
             .Where(r => r.Name.Contains("Driver", StringComparison.InvariantCultureIgnoreCase))
             .ToList();
 
-        if (driverRoles.Count is 0)
-        {
-            await FollowupAsync("Žádné role k výběru nenalezeny.", ephemeral: true);
-            PendingPracticeData.Remove(Context.User.Id);
-            return;
-        }
-
         var selectMenu = new SelectMenuBuilder()
             .WithCustomId("role_select_menu")
-            .WithPlaceholder("Vyber role pro ping")
-            .WithMinValues(minValues: 1)
-            .WithMaxValues(driverRoles.Count);
+            .WithPlaceholder("Vyber role pro ping (nepovinné)")
+            .WithMinValues(minValues: 0);
 
         foreach (var role in driverRoles)
         {
             selectMenu.AddOption(role.Name, role.Id.ToString());
         }
 
-        var builder = new ComponentBuilder().WithSelectMenu(selectMenu);
-        await FollowupAsync("Vyber prosím role, které chceš pingnout:", components: builder.Build(), ephemeral: true);
+        var builder = new ComponentBuilder()
+            .WithSelectMenu(selectMenu)
+            .WithButton("Pokračovat bez rolí", "no_roles_selected", ButtonStyle.Secondary);
+
+        var messageText = driverRoles.Count == 0
+            ? "Nenalezena žádná role k výběru, můžeš pokračovat bez rolí:"
+            : "Vyber prosím role, které chceš pingnout nebo pokračuj bez výběru:";
+
+        await FollowupAsync(messageText, components: builder.Build());
     }
 
     [ComponentInteraction("role_select_menu")]
     public async Task HandleRoleSelection(string[] selectedRoles)
     {
         await DeferAsync(ephemeral: true);
-        
+
         if (!PendingPracticeData.TryGetValue(Context.User.Id, out var data))
         {
             await FollowupAsync("Data pro trénink nenalezena. Prosím spusť /practice znovu.", ephemeral: true);
@@ -88,28 +88,68 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
         var roles = selectedRoles
             .Select(id => Context.Guild.GetRole(ulong.Parse(id)))
             .Where(r => r != null)
+            .Cast<SocketRole>()
             .ToList();
 
-        var messageContent = PracticeHelpers.CreateTrainingMessage(data.Track, data.Date, data.Time,
-            data.DriversRequired, data.QualifyingFormat, data.RaceFormat, roles,
-            data.Comment
+        await FinalizePracticeCreation(roles, data);
+    }
+
+    [ComponentInteraction("no_roles_selected")]
+    public async Task HandleNoRolesSelected()
+    {
+        await DeferAsync(ephemeral: true);
+
+        if (!PendingPracticeData.TryGetValue(Context.User.Id, out var data))
+        {
+            await FollowupAsync("Data pro trénink nenalezena. Prosím spusť /practice znovu.", ephemeral: true);
+            return;
+        }
+
+        var roles = Enumerable.Empty<SocketRole>();
+        await FinalizePracticeCreation(roles, data);
+    }
+
+    private async Task FinalizePracticeCreation(IEnumerable<SocketRole> roles, PracticeData data)
+    {
+        var socketRoles = roles.ToList();
+
+        var messageContent = PracticeHelpers.CreateTrainingMessage(
+            data.Track, data.Date, data.Time,
+            data.DriversRequired, data.QualifyingFormat, data.RaceFormat,
+            socketRoles, data.Comment
         );
 
         var components = PracticeHelpers.BuildActionComponents();
 
-        var publicMessage = await Context.Channel.SendMessageAsync(messageContent, components: components,
-            allowedMentions: AllowedMentions.All);
+        var publicMessage = await Context.Channel.SendMessageAsync(
+            messageContent,
+            components: components,
+            allowedMentions: AllowedMentions.All
+        );
 
-        await _trainingSessionService.RegisterNewSessionAsync(publicMessage.Id, Context.User.Id, Context.Guild?.Id,
-            Context.Channel?.Id);
+        await _trainingSessionService.RegisterNewSessionAsync(
+            publicMessage.Id, Context.User.Id, Context.Guild?.Id, Context.Channel?.Id
+        );
 
         await PracticeHelpers.AddSessionReactionsAsync(publicMessage);
+
+        if (Context.Channel is ITextChannel textChannel)
+        {
+            await textChannel.CreateThreadAsync(
+                "Diskuze zde",
+                autoArchiveDuration: ThreadArchiveDuration.OneWeek,
+                message: publicMessage
+            );
+        }
 
         PendingPracticeData.Remove(Context.User.Id);
 
         await ((IComponentInteraction)Context.Interaction).UpdateAsync(msg =>
         {
-            msg.Content = "Role vybrány! Trénink vytvořen.";
+            msg.Content = socketRoles.Any()
+                ? $"{Context.User.Mention} vytvořil trénink! Role vybrány! Trénink vytvořen."
+                : $"{Context.User.Mention} vytvořil trénink! Žádné role vybrány! Trénink vytvořen.";
+
             msg.Components = new ComponentBuilder().Build();
         });
     }
@@ -137,8 +177,8 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
             new Emoji("\u2753") // ❓
         ];
 
-        var users = (await Task.WhenAll(emojis.Select(e =>
-                interaction.Message.GetReactionUsersAsync(e, int.MaxValue).FlattenAsync())))
+        var users = (await Task.WhenAll(emojis
+                .Select(e => interaction.Message.GetReactionUsersAsync(e, int.MaxValue).FlattenAsync())))
             .SelectMany(u => u)
             .DistinctBy(u => u.Id);
 
@@ -210,9 +250,6 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
         [ChoiceDisplay("22:30")] _2230,
         [ChoiceDisplay("23:00")] _2300
     }
-
-    [GeneratedRegex(@"\s")]
-    private static partial Regex MyRegex();
 
     private class PracticeData
     {
