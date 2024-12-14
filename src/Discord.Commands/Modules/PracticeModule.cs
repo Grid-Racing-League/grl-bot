@@ -56,7 +56,8 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
         var selectMenu = new SelectMenuBuilder()
             .WithCustomId("role_select_menu")
             .WithPlaceholder("Vyber role pro ping (nepovinné)")
-            .WithMinValues(minValues: 0);
+            .WithMinValues(0)
+            .WithMaxValues(driverRoles.Count == 0 ? 1 : driverRoles.Count);
 
         foreach (var role in driverRoles)
         {
@@ -183,7 +184,7 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
             .DistinctBy(u => u.Id);
 
         var notificationMessage =
-            "Trénink na GRL zrušený. Klidně založ svůj vlastní v kanálu pro tréninkové registrace.";
+            "Trénink na GRL zrušený. Klidně založ svůj vlastní v kanálu pro [#tréninkové-registrace](https://discord.com/channels/706625870269251625/1294748282265927762).";
 
         await _userNotificationService.NotifyUsersAsync(users, notificationMessage);
     }
