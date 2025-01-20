@@ -9,7 +9,7 @@
 	<ItemGroup>
 		<PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.2.0"/>
 		<PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.1" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.10">
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.1">
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
 		<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.10" />
