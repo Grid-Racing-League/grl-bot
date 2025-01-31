@@ -50,7 +50,8 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
         };
 
         var driverRoles = Context.Guild.Roles
-            .Where(r => r.Name.Contains("Driver", StringComparison.InvariantCultureIgnoreCase))
+            .Where(r => r.Name.Contains("Driver", StringComparison.InvariantCultureIgnoreCase) ||
+                        r.Name.Contains("Rezerva", StringComparison.InvariantCultureIgnoreCase))
             .ToList();
 
         var selectMenu = new SelectMenuBuilder()
