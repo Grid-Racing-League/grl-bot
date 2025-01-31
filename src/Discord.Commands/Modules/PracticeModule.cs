@@ -46,6 +46,7 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
             DriversRequired = driversRequired,
             QualifyingFormat = qualifyingFormat,
             RaceFormat = raceFormat,
+            Creator = Context.User,
             Comment = comment
         };
 
@@ -118,7 +119,7 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
         var messageContent = PracticeHelpers.CreateTrainingMessage(
             data.Track, data.Date, data.Time,
             data.DriversRequired, data.QualifyingFormat, data.RaceFormat,
-            socketRoles, data.Comment
+            socketRoles, data.Creator, data.Comment
         );
 
         var components = PracticeHelpers.BuildActionComponents();
@@ -261,6 +262,7 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
         public int DriversRequired { get; set; }
         public QualifyingFormat QualifyingFormat { get; set; }
         public RaceFormat RaceFormat { get; set; }
+        public SocketUser Creator { get; set; }
         public string? Comment { get; set; }
     }
 }

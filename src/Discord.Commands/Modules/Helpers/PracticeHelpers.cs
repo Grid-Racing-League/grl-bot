@@ -15,6 +15,7 @@ internal static class PracticeHelpers
         PracticeModule.QualifyingFormat qualifyingFormat,
         PracticeModule.RaceFormat raceFormat,
         IEnumerable<SocketRole> roles,
+        SocketUser creator,
         string? comment)
     {
         var flagEmoji = GetFlagEmoji(track);
@@ -39,6 +40,8 @@ internal static class PracticeHelpers
         sb.AppendLine("Dobrovolná účast, prosím potvrď");
         sb.AppendLine($"Trénink proběhne při účasti alespoň {driversRequired} pilotů");
         sb.Append(commentMessage);
+        sb.AppendLine();
+        sb.AppendLine($"*Trénink vytvořil:* {creator.Mention}");
 
         return sb.ToString();
     }
