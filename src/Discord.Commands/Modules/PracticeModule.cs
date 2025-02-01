@@ -29,7 +29,7 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
     public async Task CreatePractice(
         Tracks track,
         string date,
-        TimeSlots time,
+        string time,
         int driversRequired,
         QualifyingFormat qualifyingFormat,
         RaceFormat raceFormat,
@@ -234,31 +234,11 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
         [ChoiceDisplay("Full")] Full
     }
 
-    public enum TimeSlots
-    {
-        [ChoiceDisplay("Upřesníme později")] Tba,
-        [ChoiceDisplay("16:00")] _1600,
-        [ChoiceDisplay("16:30")] _1630,
-        [ChoiceDisplay("17:00")] _1700,
-        [ChoiceDisplay("17:30")] _1730,
-        [ChoiceDisplay("18:00")] _1800,
-        [ChoiceDisplay("18:30")] _1830,
-        [ChoiceDisplay("19:00")] _1900,
-        [ChoiceDisplay("19:30")] _1930,
-        [ChoiceDisplay("20:00")] _2000,
-        [ChoiceDisplay("20:30")] _2030,
-        [ChoiceDisplay("21:00")] _2100,
-        [ChoiceDisplay("21:30")] _2130,
-        [ChoiceDisplay("22:00")] _2200,
-        [ChoiceDisplay("22:30")] _2230,
-        [ChoiceDisplay("23:00")] _2300
-    }
-
     private class PracticeData
     {
         public Tracks Track { get; set; }
         public string Date { get; set; } = null!;
-        public TimeSlots Time { get; set; }
+        public string Time { get; set; } = null!;
         public int DriversRequired { get; set; }
         public QualifyingFormat QualifyingFormat { get; set; }
         public RaceFormat RaceFormat { get; set; }

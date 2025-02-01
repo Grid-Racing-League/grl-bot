@@ -10,7 +10,7 @@ internal static class PracticeHelpers
     public static string CreateTrainingMessage(
         PracticeModule.Tracks track,
         string date,
-        PracticeModule.TimeSlots time,
+        string time,
         int driversRequired,
         PracticeModule.QualifyingFormat qualifyingFormat,
         PracticeModule.RaceFormat raceFormat,
@@ -20,7 +20,6 @@ internal static class PracticeHelpers
     {
         var flagEmoji = GetFlagEmoji(track);
         var formattedTrackName = GetFormattedName(track);
-        var formattedTimeSlot = GetFormattedName(time);
         var formattedQualifying = GetFormattedName(qualifyingFormat);
         var formattedRace = GetFormattedName(raceFormat);
 
@@ -29,7 +28,7 @@ internal static class PracticeHelpers
         var sb = new StringBuilder();
         sb.AppendLine($"{flagEmoji} {formattedTrackName} - trénink {flagEmoji} ");
         sb.AppendLine();
-        sb.AppendLine($"🕗 {date} {formattedTimeSlot} 🕗");
+        sb.AppendLine($"🕗 {date} {time} 🕗");
         sb.AppendLine();
         sb.AppendLine($"🏎️  {formattedQualifying} Q - {formattedRace} Race 🏎️");
         sb.AppendLine();
