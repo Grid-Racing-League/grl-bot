@@ -37,6 +37,14 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
     {
         await DeferAsync(ephemeral: true);
 
+        var randomNumber = new Random().Next(1, 21);
+        List<ulong> iDontLikeThese = [527555599458893829, 966053187679309855, 1253779648274370741, 286145083856912386, 160820064856047616];
+        if (iDontLikeThese.Contains(Context.User.Id))   
+        {
+            await FollowupAsync($"Oof, to bylo těsné! Šance, že tě nevykopnu ze serveru byla asi {randomNumber} % a tys to jen tak tak přežil, wow. Dávej příště větší pozor! :)", ephemeral: true);
+            await Task.Delay(1000);
+        }
+
         // Store initial data
         PendingPracticeData[Context.User.Id] = new PracticeData
         {
