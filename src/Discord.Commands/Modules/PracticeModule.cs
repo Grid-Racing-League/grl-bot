@@ -37,14 +37,6 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
     {
         await DeferAsync(ephemeral: true);
 
-        var randomNumber = new Random().Next(1, 21);
-        List<ulong> iDontLikeThese = [527555599458893829, 966053187679309855, 1253779648274370741, 286145083856912386, 160820064856047616];
-        if (iDontLikeThese.Contains(Context.User.Id))   
-        {
-            await FollowupAsync($"Oof, to bylo těsné! Šance, že tě nevykopnu ze serveru byla asi {randomNumber} % a tys to jen tak tak přežil, wow. Dávej příště větší pozor! :)", ephemeral: true);
-            await Task.Delay(1000);
-        }
-
         // Store initial data
         PendingPracticeData[Context.User.Id] = new PracticeData
         {
@@ -201,27 +193,32 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
 
     public enum Tracks
     {
+        [ChoiceDisplay("Australia")] Australia,
+        [ChoiceDisplay("China")] China,
+        [ChoiceDisplay("Japan")] Japan,
         [ChoiceDisplay("Bahrain")] Bahrain,
         [ChoiceDisplay("Jeddah")] Jeddah,
-        [ChoiceDisplay("Australia")] Australia,
-        [ChoiceDisplay("Japan")] Japan,
-        [ChoiceDisplay("China")] China,
         [ChoiceDisplay("Miami")] Miami,
         [ChoiceDisplay("Imola")] Imola,
+        [ChoiceDisplay("Imola Reversed")] ImolaReversed,
         [ChoiceDisplay("Monaco")] Monaco,
-        [ChoiceDisplay("Canada")] Canada,
         [ChoiceDisplay("Spain")] Spain,
+        [ChoiceDisplay("Canada")] Canada,
         [ChoiceDisplay("Austria")] Austria,
+        [ChoiceDisplay("Austria Reversed")] AustriaReversed,
         [ChoiceDisplay("Great Britain")] GreatBritain,
-        [ChoiceDisplay("Hungary")] Hungary,
+        [ChoiceDisplay("Great Britain Reversed")] GreatBritainReversed,
         [ChoiceDisplay("Belgium")] Belgium,
+        [ChoiceDisplay("Hungary")] Hungary,
         [ChoiceDisplay("Netherlands")] Netherlands,
         [ChoiceDisplay("Monza")] Monza,
         [ChoiceDisplay("Azerbaijan")] Azerbaijan,
         [ChoiceDisplay("Singapore")] Singapore,
         [ChoiceDisplay("Texas")] Texas,
         [ChoiceDisplay("Mexico")] Mexico,
+        [ChoiceDisplay("Brazil")] Brazil,
         [ChoiceDisplay("Las Vegas")] LasVegas,
+        [ChoiceDisplay("Qatar")] Qatar,
         [ChoiceDisplay("Abu Dhabi")] AbuDhabi
     }
 
