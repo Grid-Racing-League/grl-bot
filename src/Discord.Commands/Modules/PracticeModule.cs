@@ -52,7 +52,8 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
 
         var driverRoles = Context.Guild.Roles
             .Where(r => r.Name.Contains("Driver", StringComparison.InvariantCultureIgnoreCase) ||
-                        r.Name.Contains("Rezerva", StringComparison.InvariantCultureIgnoreCase))
+                        r.Name.Contains("Rezerva", StringComparison.InvariantCultureIgnoreCase) ||
+                        r.Name.Contains("Milovníci tréninků", StringComparison.InvariantCultureIgnoreCase))
             .ToList();
 
         var selectMenu = new SelectMenuBuilder()
@@ -68,7 +69,7 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
 
         var builder = new ComponentBuilder()
             .WithSelectMenu(selectMenu)
-            .WithButton("Pokračovat bez rolí", "no_roles_selected", ButtonStyle.Secondary);
+            .WithButton("Pokračovat", "no_roles_selected", ButtonStyle.Secondary);
 
         var messageText = driverRoles.Count == 0
             ? "Nenalezena žádná role k výběru, můžeš pokračovat bez rolí:"
@@ -91,7 +92,6 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
         var roles = selectedRoles
             .Select(id => Context.Guild.GetRole(ulong.Parse(id)))
             .Where(r => r != null)
-            .Cast<SocketRole>()
             .ToList();
 
         await FinalizePracticeCreation(roles, data);
