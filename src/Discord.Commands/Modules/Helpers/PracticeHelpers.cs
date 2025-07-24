@@ -61,11 +61,18 @@ internal static class PracticeHelpers
         await message.AddReactionAsync(questionMark);
     }
 
-    public static async Task MarkPracticeMessageAsCanceledAsync(IUserMessage message)
+    public static async Task MarkPracticeMessageAsCanceledAsync(IUserMessage message, IUser? cancelledBy = null)
     {
+        string cancelMessage = "🚫 **TRÉNINK ZRUŠEN**";
+
+        if (cancelledBy is not null)
+        {
+            cancelMessage += $"\n\n*Zrušeno uživatelem: {cancelledBy.Mention} v {DateTime.Now:HH:mm dd.MM.yyyy}*";
+        }
+
         await message.ModifyAsync(msg =>
         {
-            msg.Content = "🚫 **TRÉNINK ZRUŠEN**";
+            msg.Content = cancelMessage;
             msg.Components = new ComponentBuilder().Build();
         });
     }

@@ -172,7 +172,7 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
             return;
         }
 
-        await PracticeHelpers.MarkPracticeMessageAsCanceledAsync(interaction.Message);
+        await PracticeHelpers.MarkPracticeMessageAsCanceledAsync(interaction.Message, Context.User);
 
         List<Emoji> emojis =
         [
@@ -186,7 +186,7 @@ public sealed partial class PracticeModule : InteractionModuleBase<SocketInterac
             .DistinctBy(u => u.Id);
 
         var notificationMessage =
-            "Trénink na GRL zrušený. Klidně založ svůj vlastní v kanálu pro [#tréninkové-registrace](https://discord.com/channels/706625870269251625/1294748282265927762).";
+            $"Trénink na GRL zrušený uživatelem {Context.User.Mention}. Klidně založ svůj vlastní v kanálu pro [#tréninkové-registrace](https://discord.com/channels/706625870269251625/1294748282265927762).";
 
         await _userNotificationService.NotifyUsersAsync(users, notificationMessage);
     }
