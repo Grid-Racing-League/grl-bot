@@ -7,12 +7,11 @@ using Microsoft.Extensions.Hosting;
 using Persistence.Extensions;
 
 var builder = Host.CreateDefaultBuilder(args);
+var environmentName = Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT");
 
 builder.ConfigureSerilog();
 builder.ConfigureAppConfiguration(config =>
 {
-    var environmentName = Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT");
-
     config.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
     config.AddJsonFile($"appsettings.{environmentName}.json", optional: true, reloadOnChange: true);
 });
@@ -27,4 +26,11 @@ builder.ConfigureServices((hostBuilder, services) =>
     services.AddDiscordCommands(hostBuilder.Configuration);
 });
 
-await builder.Build().RunAsync();
+var app = builder.Build();
+
+if (environmentName is "Development")
+{
+    app.ApplyMigrations();
+}
+
+await app.RunAsync();
