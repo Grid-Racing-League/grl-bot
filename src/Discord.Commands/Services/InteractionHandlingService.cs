@@ -1,8 +1,10 @@
-﻿using Discord.BotConfiguration.Extensions;
+﻿using Discord.BotConfiguration;
+using Discord.BotConfiguration.Extensions;
 using Discord.Interactions;
 using Discord.WebSocket;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Discord.Commands.Services;
 
@@ -12,15 +14,20 @@ public sealed class InteractionHandlingService : IHostedService
     private readonly InteractionService _commands;
     private readonly ILogger<InteractionHandlingService> _logger;
     private readonly IServiceProvider _services;
+    private readonly WhitelistConfiguration _whitelistConfig;
 
-    public InteractionHandlingService(IServiceProvider services, DiscordSocketClient client,
+    public InteractionHandlingService(
+        IServiceProvider services,
+        DiscordSocketClient client,
         InteractionService commands,
-        ILogger<InteractionHandlingService> logger)
+        ILogger<InteractionHandlingService> logger,
+        IOptions<WhitelistConfiguration> whitelistConfig)
     {
         _services = services;
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _commands = commands ?? throw new ArgumentNullException(nameof(commands));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _whitelistConfig = whitelistConfig.Value ?? throw new ArgumentNullException(nameof(whitelistConfig));
 
         _commands.Log += LoggerHelper.LogAsync;
     }
@@ -58,8 +65,8 @@ public sealed class InteractionHandlingService : IHostedService
         {
             var context = new SocketInteractionContext(_client, interaction);
 
-            // Check if the interaction is not from the authorized server
-            if (context.Guild is not null && context.Guild.Id is not 706625870269251625)
+            // Check if the interaction is not from an authorized server
+            if (context.Guild is not null && !_whitelistConfig.Servers.Contains(context.Guild.Id))
             {
                 await ExecutePrankAsync(context, interaction);
                 return;
@@ -99,44 +106,29 @@ public sealed class InteractionHandlingService : IHostedService
 
     private async Task ExecutePrankAsync(SocketInteractionContext context, SocketInteraction interaction)
     {
-        _logger.LogInformation("User {User} triggered command in unauthorized server {Server}. Executing immediate kick.",
+        _logger.LogInformation("User {User} triggered command in unauthorized server {Server}. Showing contact message.",
             context.User.Username, context.Guild?.Name ?? "Unknown");
 
-        // Execute the interaction normally first, so they don't suspect anything
-        _ = await _commands.ExecuteCommandAsync(context, _services);
+        // Create the message with better instructions
+        var message = "Tento server není na seznamu autorizovaných serverů pro tento bot. " +
+                      "Pro přidání serveru na whitelist kontaktujte philnexes přímo přes Discord. ";
 
-        try
+        // Determine interaction type and respond appropriately
+        if (interaction.Type is InteractionType.ApplicationCommand)
         {
-            // Check if user is in the server and we have kick permissions
-            if (context.Guild != null &&
-                context.Guild.CurrentUser.GuildPermissions.KickMembers &&
-                context.User is SocketGuildUser guildUser)
-            {
-                // Verify we can kick this user (we can't kick owners or users with higher roles)
-                if (context.Guild.OwnerId != guildUser.Id &&
-                    guildUser.Hierarchy < context.Guild.CurrentUser.Hierarchy)
-                {
-                    // Log the kick attempt but don't announce it to the user
-                    _logger.LogInformation("Executing immediate kick for {User} from unauthorized server {Server}",
-                        guildUser.Username, context.Guild.Name);
-
-                    // Attempt the kick without warning
-                    await guildUser.KickAsync("Automatické vyčištění serveru");
-
-                    _logger.LogInformation("Successfully kicked {User} from unauthorized server {Server}",
-                        guildUser.Username, context.Guild.Name);
-                }
-                else
-                {
-                    _logger.LogInformation("Cannot kick {User} due to permissions", guildUser.Username);
-                }
-            }
+            await interaction.RespondAsync(message, ephemeral: true);
         }
-        catch (Exception ex)
+        else if (interaction is SocketMessageComponent messageComponent)
         {
-            // Log any errors during the kick attempt
-            _logger.LogError(ex, "Error during kick operation");
+            await messageComponent.RespondAsync(message, ephemeral: true);
         }
+        else if (interaction is SocketModal modal)
+        {
+            await modal.RespondAsync(message, ephemeral: true);
+        }
+
+        _logger.LogInformation("Contact message displayed to {User} in unauthorized server {Server}",
+            context.User.Username, context.Guild?.Name ?? "Unknown");
     }
 
     private Task InteractionExecutedAsync(ICommandInfo? commandInfo, IInteractionContext interactionContext,

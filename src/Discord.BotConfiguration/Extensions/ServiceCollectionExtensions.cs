@@ -15,6 +15,11 @@ public static class ServiceCollectionExtensions
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        services.AddOptions<WhitelistConfiguration>()
+            .BindConfiguration(WhitelistConfiguration.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
         services.AddDiscordSocketClient(configuration);
         services.AddHostedService<DiscordBotStartupService>();
 
